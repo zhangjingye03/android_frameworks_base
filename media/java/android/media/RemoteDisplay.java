@@ -44,12 +44,22 @@ public final class RemoteDisplay {
     private native void nativeDispose(long ptr);
     private native void nativePause(long ptr);
     private native void nativeResume(long ptr);
+	
+// Mediatek {
+    private static boolean isDispose = false;
+    private static final Object lock = new Object();
+    private native void nativeSetWfdLevel(long ptr, int level);
+    private native int  nativeGetWfdParam(long ptr, int paramType);
+	//WFD Sink Support
+    private native long nativeConnect(String iface, Surface surface);
+    private native void nativeSuspendDisplay(long ptr, boolean suspend, Surface surface);
+    private native void nativeSendUibcEvent(long ptr, String eventDesc);
 
     private RemoteDisplay(Listener listener, Handler handler) {
         mListener = listener;
         mHandler = handler;
     }
-
+// }
     @Override
     protected void finalize() throws Throwable {
         try {
@@ -86,6 +96,12 @@ public final class RemoteDisplay {
      * Disconnects the remote display and stops listening for new connections.
      */
     public void dispose() {
+        synchronized (lock) {
+            if (isDispose) {
+                return;
+            }
+            isDispose = true;
+        }
         dispose(false);
     }
 
@@ -110,6 +126,9 @@ public final class RemoteDisplay {
             nativeDispose(mPtr);
             mPtr = 0;
         }
+        synchronized (lock) {
+            isDispose = false;
+        }
     }
 
     private void startListening(String iface) {
@@ -120,6 +139,88 @@ public final class RemoteDisplay {
         }
         mGuard.open("dispose");
     }
+	
+// Mediatek {
+    /*
+     *
+     * @hide
+     *
+     */
+    public void setWfdLevel(int level) {
+        nativeSetWfdLevel(mPtr, level);
+    }
+
+    /*
+    *
+     * @hide
+     *
+     */
+    public int getWfdParam(int paramType) {
+        return nativeGetWfdParam(mPtr, paramType);
+    }
+
+    //WFD Sink Support
+
+    /*
+     *
+     * @hide
+     *
+     */
+    public static RemoteDisplay connect(String iface, Surface surface, Listener listener, Handler handler) {
+        if (iface == null) {
+            throw new IllegalArgumentException("iface must not be null");
+        }
+        if (listener == null) {
+            throw new IllegalArgumentException("listener must not be null");
+        }
+        if (handler == null) {
+            throw new IllegalArgumentException("handler must not be null");
+        }
+
+        RemoteDisplay display = new RemoteDisplay(listener, handler);
+        display.startConnecting(iface, surface);
+        return display;
+    }
+
+    /*
+     *
+     * @hide
+     *
+     */
+    private void startConnecting(String iface, Surface surface) {
+        mPtr = nativeConnect(iface, surface);
+        if (mPtr == 0) {
+            throw new IllegalStateException("Could not start connecting for "
+                    + "remote display connection on \"" + iface + "\"");
+        }
+        mGuard.open("dispose");
+    }
+
+    /*
+     *
+     * @hide
+     *
+     */
+    public void suspendDisplay(boolean suspend, Surface surface) {
+        if (suspend && surface != null) {
+            throw new IllegalArgumentException("surface must be null when suspend display");
+        }
+        if (!suspend && surface == null) {
+            throw new IllegalArgumentException("surface must not be null when resume display");
+        }
+
+        nativeSuspendDisplay(mPtr, suspend, surface);
+    }
+
+    /*
+     *
+     * @hide
+     *
+     */
+    public void sendUibcEvent(String eventDesc) {
+        nativeSendUibcEvent(mPtr, eventDesc);
+    }
+// }
 
     // Called from native.
     private void notifyDisplayConnected(final Surface surface,
@@ -151,6 +252,26 @@ public final class RemoteDisplay {
             }
         });
     }
+	
+// Mediatek {
+    private void  notifyDisplayKeyEvent(final int uniCode, final int flags) {
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                mListener.onDisplayKeyEvent(uniCode, flags);
+            }
+        });
+    }
+
+    private void notifyDisplayGenericMsgEvent(final int event) {
+         mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                mListener.onDisplayGenericMsgEvent(event);
+            }
+        });
+    }
+// }
 
     /**
      * Listener invoked when the remote display connection changes state.
@@ -160,5 +281,9 @@ public final class RemoteDisplay {
                 int width, int height, int flags, int session);
         void onDisplayDisconnected();
         void onDisplayError(int error);
+// Mediatek {
+        void onDisplayKeyEvent(int uniCode, int flags);
+        void onDisplayGenericMsgEvent(int event);
+// }
     }
 }
