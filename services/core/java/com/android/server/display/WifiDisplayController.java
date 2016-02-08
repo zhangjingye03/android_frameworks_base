@@ -788,31 +788,6 @@ final class WifiDisplayController implements DumpUtils.Dump {
                         handleConnectionFailure(false);
                     }
                 }
-				
-				// Mediatek {
-                @Override
-                public void onDisplayKeyEvent(int uniCode, int flags) {
-                    Slog.d(TAG, "onDisplayKeyEvent:uniCode=" + uniCode);
-					/**if (mInputMethodManager != null) {
-						try {
-							if (mWakeLock != null) {
-								mWakeLock.acquire();
-							}
-							mInputMethodManager.sendCharacterToCurClient(uniCode);
-							if (mWakeLock != null) {
-								mWakeLock.release();
-							}
-						} catch (android.os.RemoteException e) {
-							e.printStackTrace();
-						}
-					}*/
-				}
-				
-				@Override
-				public void onDisplayGenericMsgEvent(int event) {
-                    Slog.d(TAG, "onDisplayGenericMsgEvent: " + event);
-				}
-				// }
             };
             if(ExtendedRemoteDisplayHelper.isAvailable()){
                 mExtRemoteDisplay = ExtendedRemoteDisplayHelper.listen(iface,
